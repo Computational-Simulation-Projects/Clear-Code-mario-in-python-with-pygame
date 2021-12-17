@@ -14,18 +14,52 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=pos)
 
         # player movement
-        self.speed = 5
         self.direction = pygame.math.Vector2(0, 0)
+        self.speed = 5
         self.gravity = 0.8
         self.jump_speed = -16
 
+        # player status
+        self.status = 'idle'
+        self.facing_right = True
+        self.on_ground = False
+        self.on_ceiling = False
+        self.on_left = False
+        self.on_right = False
+
     def animate(self):
-        animation = self.animations['idle']
+        animation = self.animations[self.status]
 
         # loop over the frame index
         self.frame_index += self.animation_speed
 
-        self.image = animation[int(self.frame_index) % len(animation)]
+        image = animation[int(self.frame_index) % len(animation)]
+
+        if self.facing_right:
+            self.image = image
+        else:
+            # flip horizontally -> True, flip vertically -> False
+            flipped_image = pygame.transform.flip(image, True, False)
+            self.image = flipped_image
+
+        # set the rect to the image size
+        # when on the ground
+        if self.on_ground and self.on_right:
+            self.rect = self.image.get_rect(bottomright=self.rect.bottomright)
+        elif self.on_ground and self.on_left:
+            self.rect = self.image.get_rect(bottomleft=self.rect.bottomleft)
+        elif self.on_ground:
+            self.rect = self.image.get_rect(midbottom=self.rect.midbottom)
+
+        # when in the air
+        elif self.on_ceiling and self.on_right:
+            self.rect = self.image.get_rect(topright=self.rect.topright)
+        elif self.on_ceiling and self.on_left:
+            self.rect = self.image.get_rect(topleft=self.rect.topleft)
+        elif self.on_ceiling:
+            self.rect = self.image.get_rect(midtop=self.rect.midtop)
+        else:
+            self.rect = self.image.get_rect(center=self.rect.center)
 
     def import_character_assets(self):
         character_path = './graphics/character/'
@@ -45,15 +79,28 @@ class Player(pygame.sprite.Sprite):
 
         if keys and (keys[pygame.K_LEFT] or keys[pygame.K_a]):
             self.direction.x = -1
+            self.facing_right = False
 
         elif keys and (keys[pygame.K_RIGHT] or keys[pygame.K_d]):
             self.direction.x = 1
+            self.facing_right = True
 
-        elif keys and (keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]):
+        elif keys and (keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]) and self.on_ground:
             self.jump()
 
         else:
             self.direction.x = 0
+
+    def get_status(self):
+        if self.direction.y < 0:
+            self.status = 'jump'
+        elif self.direction.y > 1:  # 1 or any number greater than self.gravity -> 0.8
+            self.status = 'fall'
+        else:
+            if self.direction.x != 0:
+                self.status = 'run'
+            else:
+                self.status = 'idle'
 
     def apply_gravity(self):
         self.direction.y += self.gravity
@@ -64,4 +111,5 @@ class Player(pygame.sprite.Sprite):
 
     def update(self):
         self.get_input()
+        self.get_status()
         self.animate()
